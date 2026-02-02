@@ -16,7 +16,9 @@ async def criar_pedido(pedido_schema: PedidoSchema, session: Session = Depends(g
     """
     Docstring for criar_pedido
     """
-    novo_pedido = Pedido(usuario=pedido_schema.id_usuario)
+    novo_pedido = Pedido(usuario=pedido_schema.usuario)
     session.add(novo_pedido)
     session.commit()
     return {"message": f"Pedido criado com sucesso. ID do pedido: {novo_pedido.id}"}
+
+

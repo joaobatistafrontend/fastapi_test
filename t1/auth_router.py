@@ -30,6 +30,11 @@ async def criar_conta(usuario_schema: UsuarioSchemas, session: Session = Depends
         session.commit()
         return {"message": "Usuario criado com sucesso", "cuenta_creada": True}
 
-
+@auth_router.post("/login")
+async def login(pedido_schema: PerdidoSchema, session: Session = Depends(get_sessao)):
+    """
+    Docstring for login
+    """
+    return {"message": "Login realizado com sucesso", "logado": True}
 
     

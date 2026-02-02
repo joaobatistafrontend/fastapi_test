@@ -41,7 +41,7 @@ class Pedido(Base):
 
     def __init__(self, usuario, status="PENDENTE", preco=0):
         self.status = status
-        self.usuario_id = usuario
+        self.usuario = usuario
         self.preco = preco
 
 
