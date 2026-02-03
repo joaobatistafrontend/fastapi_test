@@ -66,7 +66,26 @@ async def criar_conta(usuario_schema: UsuarioSchemas, session: Session = Depends
         raise HTTPException(status_code=400, detail=f"message: Já existe um usuario com esse email: {usuario_schema.email}",)
     else:
         senha_criptografada = brcrypt_context.hash(usuario_schema.senha)
-        noovo_usuario = Usuario(nome=usuario_schema.nome, email=usuario_schema.email, senha=senha_criptografada, ativo=usuario_schema.ativo, admin=usuario_schema.admin)
+        noovo_usuario = Usuario(nome=usuario_schema.nome, email=usuario_schema.email, senha=senha_criptografada, ativo=usuario_schema.ativo, admin=False)
+        session.add(noovo_usuario)
+        session.commit()
+        return {"message": "Usuario criado com sucesso", "cuenta_creada": True}
+
+
+@auth_router.post("/criar_conta_admin")
+async def criar_conta(usuario_schema: UsuarioSchemas, session: Session = Depends(get_sessao), usuario_atual: Usuario = Depends(verificar_token)):
+    """
+    Docstring for criar_conta
+    """
+    if not usuario_atual.admin:
+        raise HTTPException(status_code=403, detail="Você não tem permissão para criar contas administrativas")
+        
+    usuario = session.query(Usuario).filter(Usuario.email == usuario_schema.email).first()
+    if usuario:
+        raise HTTPException(status_code=400, detail=f"message: Já existe um usuario com esse email: {usuario_schema.email}",)
+    else:
+        senha_criptografada = brcrypt_context.hash(usuario_schema.senha)
+        noovo_usuario = Usuario(nome=usuario_schema.nome, email=usuario_schema.email, senha=senha_criptografada, ativo=usuario_schema.ativo, admin=True)
         session.add(noovo_usuario)
         session.commit()
         return {"message": "Usuario criado com sucesso", "cuenta_creada": True}
