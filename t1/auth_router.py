@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from models import Usuario, db
 from sqlalchemy.orm import sessionmaker  
-from dependencias import get_sessao
+from dependencias import *
 from crypt import brcrypt_context
 from schemas import *
 from sqlalchemy.orm import Session
@@ -10,7 +10,7 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import os
-
+from fastapi.security import OAuth2PasswordRequestForm
 
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -22,37 +22,18 @@ ALFORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
 
-#jwt simples
-# def criar_token(id_usuario: str):
-#     """
-#     Docstring for criar_token
-#     """
-#     token = f"vdsdvvsdvds{id_usuario}"
-#     return token
 
-def criar_token(id_usuario: str):
+def criar_token(id_usuario: str, duracao_token=ACCESS_TOKEN_EXPIRE_MINUTES):
     """
     Docstring for criar_token
     """
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=duracao_token)
     payload = {
         "sub": str(id_usuario),
         "exp": expire
     }
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALFORITHM)
     return token
-
-
-#jwt avançado
-# def criar_token(id_usuario: str):
-#     """
-#     Docstring for criar_token
-#     """
-#     payload = {
-#         "sub": id_usuario
-#     }
-#     token = jwt.encode(payload, "segredo_super_secreto", algorithm="HS256")
-#     return token
 
 
 def autenticar_usuario(email: str, senha: str, session: Session):
@@ -90,6 +71,26 @@ async def criar_conta(usuario_schema: UsuarioSchemas, session: Session = Depends
         session.commit()
         return {"message": "Usuario criado com sucesso", "cuenta_creada": True}
 
+
+@auth_router.post("/login-form")
+async def login_form(dados_form: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_sessao)):
+    """
+    Docstring for login
+    """
+    usuario = autenticar_usuario(dados_form.username, dados_form.password, session)
+    if not usuario:
+        raise HTTPException(status_code=400, detail="Email ou senha incorretos ou credenciais inválidas")
+    else:
+        access_token = criar_token(usuario.id)
+        refresh_token = criar_token(usuario.id, duracao_token=60 * 24 * 7)  # 7 dias
+
+        return {
+                "access_token": access_token, 
+                "token_type": "bearer"
+            }
+        
+
+
 @auth_router.post("/login")
 async def login(login_schema: LoginSchema, session: Session = Depends(get_sessao)):
     """
@@ -100,8 +101,24 @@ async def login(login_schema: LoginSchema, session: Session = Depends(get_sessao
         raise HTTPException(status_code=400, detail="Email ou senha incorretos ou credenciais inválidas")
     else:
         access_token = criar_token(usuario.id)
-        return {"access_token": access_token, "token_type": "bearer"}
+        refresh_token = criar_token(usuario.id, duracao_token=60 * 24 * 7)  # 7 dias
+
+        return {
+                "access_token": access_token, 
+                "refresh_token": refresh_token,
+                "token_type": "bearer"
+            }
         
-    # if not brcrypt_context.verify(login_schema.senha, Usuario.senha):
-    #     raise HTTPException(status_code=400, detail="Email ou senha incorretos")
-    
+
+
+@auth_router.get("/refresh")
+async def  refresh_token(usuario: Usuario = Depends(verificar_token)):
+    """
+    Docstring for refresh_token
+    """
+    access_token = criar_token(usuario.id)
+    return {
+            "access_token": access_token,
+             "refresh_token": refresh_token,
+             "token_type": "bearer"
+            }
