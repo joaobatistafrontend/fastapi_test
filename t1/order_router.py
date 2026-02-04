@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from dependencias import get_sessao, verificar_token
-from schemas import PedidoSchema, ItemPedidoSchema
+from schemas import PedidoResponseSchema, PedidoSchema, ItemPedidoSchema
 from models import Pedido, Usuario, db, ItemPedido
-
+from typing import List
 
 order_router = APIRouter(prefix="/pedidos", tags=["orders"], dependencies=[Depends(verificar_token)])
 
@@ -268,3 +268,22 @@ async def resumo_pedidos_finalizados(session: Session = Depends(get_sessao), usu
         "total_pedidos_finalizados": total_finalizados,
         "receita_total": receita_total
     }
+
+#response_model serve para pedir um padrao sem precisar de um
+    # return {
+    #     "total_pedidos_finalizados": total_finalizados,
+    #     "receita_total": receita_total
+    # }
+#apenas retornar os pedidos do usuario autenticado
+
+@order_router.post("/listtar/pedidos-usuario", response_model=List[PedidoResponseSchema])
+async def listar_pedidos_usuario(
+        session: Session = Depends(get_sessao),
+        usuario: Usuario = Depends(verificar_token)
+    ):
+    """
+    Docstring for listar_pedidos_usuario
+    """
+    
+    pedidos_usuario = session.query(Pedido).filter(Pedido.usuario == usuario.id).all()
+    return pedidos_usuario
