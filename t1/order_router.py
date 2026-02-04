@@ -118,7 +118,6 @@ async def adicionar_item_pedido(
     }
     
 
-
 @order_router.post("/pedido/remove/{id_item_pedido}")
 async def remover_item_pedido(
             id_item_pedido: int,
@@ -158,4 +157,114 @@ async def remover_item_pedido(
                 "preco_unitario": item_pedido.preco_unitario
             },
         }
+
+
+@order_router.get("/pedido/finalizar/{pedido_id}")
+async def finalizar_pedido(pedido_id: int, session: Session = Depends(get_sessao), usuario: Usuario = Depends(verificar_token)):
+    """
+    Docstring for finalizar_pedido
+    """
+    pedido = session.query(Pedido).filter(Pedido.id == pedido_id).first()
+    if not usuario.admin and usuario.id != pedido.usuario:
+        raise HTTPException(status_code=403, detail="Você não tem permissão para cancelar este pedido")
+    if pedido_id is None:
+        raise HTTPException(status_code=400, detail="ID do pedido é obrigatório")
+
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    pedido.status = "FINALIZADO"
+    session.commit()
+    return {
+            "message": f"Pedido {pedido_id} finalizado com sucesso.",
+            "pedido": {
+                "id": pedido.id,
+                "status": pedido.status,
+                "usuario": pedido.usuario,
+                "preco": pedido.preco
+            }
+        }
+
+
+@order_router.get("/pedido/{pedido_id}")
+async def obter_pedido(pedido_id: int, session: Session = Depends(get_sessao), usuario: Usuario = Depends(verificar_token)):
+    """
+    Docstring for obter_pedido
+    """
+    pedido = session.query(Pedido).filter(Pedido.id == pedido_id).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    if not usuario.admin and usuario.id != pedido.usuario:
+        raise HTTPException(status_code=403, detail="Você não tem permissão para visualizar este pedido")
+
+    return {
+            "quantidade_itens": len(pedido.itens),
+            "pedido": {
+                "id": pedido.id,
+                "status": pedido.status,
+                "usuario": pedido.usuario,
+                "preco": pedido.preco,
+                "itens": [
+                    {
+                        "id": item.id,
+                        "quantidade": item.quantidade,
+                        "sabor": item.sabor,
+                        "tamanho": item.tamanho,
+                        "preco_unitario": item.preco_unitario
+                    } for item in pedido.itens
+                ]
+            }
+        }
+
+
+@order_router.get("/pedido/finalizados/listar")
+async def listar_pedidos_finalizados(session: Session = Depends(get_sessao), usuario: Usuario = Depends(verificar_token)):
+    """
+    Docstring for listar_pedidos_finalizados
+    """
+    if not usuario.admin and usuario.ativo == False:
+        raise HTTPException(status_code=403, detail="Usuário inativo não pode listar pedidos")
+    else:
+        pedidos_finalizados = session.query(Pedido).filter(Pedido.status == "FINALIZADO").all()
+     
+    return {"pedidos_finalizados": pedidos_finalizados}
+
+@order_router.get("/pedido/cancelados/listar")
+async def listar_pedidos_cancelados(session: Session = Depends(get_sessao), usuario: Usuario = Depends(verificar_token)):
+    """
+    Docstring for listar_pedidos_cancelados
+    """
+    if not usuario.admin and usuario.ativo == False:
+        raise HTTPException(status_code=403, detail="Usuário inativo não pode listar pedidos")
+    else:
+        pedidos_cancelados = session.query(Pedido).filter(Pedido.status == "CANCELADO").all()
+     
+    return {"pedidos_cancelados": pedidos_cancelados}
+
+@order_router.get("/pedido/pedentes/listar")
+async def listar_pedidos_pendentes(session: Session = Depends(get_sessao), usuario: Usuario = Depends(verificar_token)):
+    """
+    Docstring for listar_pedidos_pendentes
+    """
+    if not usuario.admin and usuario.ativo == False:
+        raise HTTPException(status_code=403, detail="Usuário inativo não pode listar pedidos")
+    else:
+        pedidos_pendentes = session.query(Pedido).filter(Pedido.status == "PENDENTE").all()
+     
+    return {"pedidos_pendentes": pedidos_pendentes}
+
+@order_router.post("/pedido/resumo/finalizados")
+async def resumo_pedidos_finalizados(session: Session = Depends(get_sessao), usuario: Usuario = Depends(verificar_token)):
+    """
+    Docstring for resumo_pedidos_finalizados
+    """
+    if not usuario.admin:
+        raise HTTPException(status_code=403, detail="Apenas administradores podem acessar o resumo de pedidos finalizados")
     
+    pedidos_finalizados = session.query(Pedido).filter(Pedido.status == "FINALIZADO").all()
+    total_finalizados = len(pedidos_finalizados)
+    receita_total = sum(pedido.preco for pedido in pedidos_finalizados)
+
+    return {
+        "total_pedidos_finalizados": total_finalizados,
+        "receita_total": receita_total
+    }
